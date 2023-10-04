@@ -1,76 +1,93 @@
-// External libraries
 #include <SimpleDHT.h>
 #include <Servo.h>
 
-// Variables for what pin are the electronics connected to
-#define pinWater A3
-#define pinServo 3
-#define pinDHT 2
+class DHTSensor {
+  private:
+    SimpleDHT11 dht;
+    byte temperature;
+    byte humidity;
+  
+  public:
+    DHTSensor(int pin) : dht(pin) {}
+  
+    void refresh() {
+      int err = SimpleDHTErrSuccess;
+      if ((err = dht.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
+        Serial.print("Read DHT11 failed, err="); Serial.print(SimpleDHTErrCode(err));
+      }
+    }
 
-// Initialising dht and servo libraries
-SimpleDHT11 dht11(pinDHT);
-Servo servo;
+    byte getTemperature() const {
+      return temperature;
+    }
 
-// Variables for storing useful data
-byte temperature = 0;
-byte humidity = 0;
-int water = 0;
-char userInput;
+    byte getHumidity() const {
+      return humidity;
+    }
+};
 
-// Cannot cycle faster than dht sample rate, used as delay timer.
-int dhtSampleRate = 1500;
+class WaterSensor {
+  private:
+    int pin;
+    int waterLevel;
+    
+  public:
+    WaterSensor(int pin) : pin(pin) {}
+  
+    void refresh() {
+      waterLevel = analogRead(pin);
+    }
 
-// Initialises serial at correct baud rate and attaches servo to correct pin.
+    int getWaterLevel() const {
+      return waterLevel;
+    }
+};
+
+class WaterValve {
+  private:
+    Servo servo;
+    
+  public:
+    WaterValve(int pin) {
+      servo.attach(pin);
+    }
+    
+    void open() {
+      servo.write(90);
+    }
+    
+    void close() {
+      servo.write(45);
+    }
+};
+
+const int DHT_PIN = 2;
+const int WATER_PIN = A3;
+const int SERVO_PIN = 3;
+const int DHT_SAMPLE_RATE = 1500;
+
+DHTSensor dhtSensor(DHT_PIN);
+WaterSensor waterSensor(WATER_PIN);
+WaterValve waterValve(SERVO_PIN);
+
 void setup() {
   Serial.begin(115200);
-  servo.attach(pinServo);
+  waterValve.close();
 }
 
 void loop() {
-  // Starts system with closed water
-  closeWater();
-
-  // Checks for signal from app to dispense water
-  if (Serial.available() > 0) {
-    if (Serial.read() == 'a') {
-      openWater();
-      delay(3000);
-      closeWater();
-    }
+  if (Serial.available() > 0 && Serial.read() == 'a') {
+    waterValve.open();
+    delay(3000);
+    waterValve.close();
   }
 
-  // Updates data variables with fresh data
-  dhtRefresh();
-  waterRefresh();
+  dhtSensor.refresh();
+  waterSensor.refresh();
 
-  // Pushes fresh data to serial for app to grab
-  Serial.print('t'); Serial.println(temperature);
-  Serial.print('h'); Serial.println(humidity);
-  Serial.print('w'); Serial.println(water);
+  Serial.print('t'); Serial.println(dhtSensor.getTemperature());
+  Serial.print('h'); Serial.println(dhtSensor.getHumidity());
+  Serial.print('w'); Serial.println(waterSensor.getWaterLevel());
   
-  // Delays next loop with dht sample rate cap
-  delay(dhtSampleRate);
-}
-
-// Makes sure dht does not return an error, collects fresh data
-void dhtRefresh() {
-  int err = SimpleDHTErrSuccess;
-  if ((err = dht11.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
-    Serial.print("Read DHT11 failed, err="); Serial.print(SimpleDHTErrCode(err));
-  }
-}
-
-// Collects fresh data from water sensor
-void waterRefresh() {
-  water = analogRead(pinWater);
-}
-
-// Triggers servo to close the air intake hole
-void closeWater() {
-  servo.write(45);
-}
-
-// Triggers servo to open air intake hole
-void openWater() {
-  servo.write(90);
+  delay(DHT_SAMPLE_RATE);
 }
