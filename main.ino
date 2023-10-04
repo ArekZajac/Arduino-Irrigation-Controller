@@ -1,6 +1,11 @@
 #include <SimpleDHT.h>
 #include <Servo.h>
 
+// Function to log messages
+void logMessage(const char* message) {
+  Serial.println(message);
+}
+
 class DHTSensor {
   private:
     SimpleDHT11 dht;
@@ -8,12 +13,16 @@ class DHTSensor {
     byte humidity;
   
   public:
-    DHTSensor(int pin) : dht(pin) {}
+    DHTSensor(int pin) : dht(pin) {
+      logMessage("DHTSensor initialized.");
+    }
   
     void refresh() {
       int err = SimpleDHTErrSuccess;
       if ((err = dht.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
-        Serial.print("Read DHT11 failed, err="); Serial.print(SimpleDHTErrCode(err));
+        Serial.print("Read DHT11 failed, err="); Serial.println(SimpleDHTErrCode(err));
+      } else {
+        logMessage("DHT data refreshed.");
       }
     }
 
@@ -32,10 +41,13 @@ class WaterSensor {
     int waterLevel;
     
   public:
-    WaterSensor(int pin) : pin(pin) {}
+    WaterSensor(int pin) : pin(pin) {
+      logMessage("WaterSensor initialized.");
+    }
   
     void refresh() {
       waterLevel = analogRead(pin);
+      logMessage("Water data refreshed.");
     }
 
     int getWaterLevel() const {
@@ -50,14 +62,17 @@ class WaterValve {
   public:
     WaterValve(int pin) {
       servo.attach(pin);
+      logMessage("WaterValve initialized.");
     }
     
     void open() {
       servo.write(90);
+      logMessage("Water valve opened.");
     }
     
     void close() {
       servo.write(45);
+      logMessage("Water valve closed.");
     }
 };
 
@@ -72,11 +87,13 @@ WaterValve waterValve(SERVO_PIN);
 
 void setup() {
   Serial.begin(115200);
+  logMessage("Setup completed.");
   waterValve.close();
 }
 
 void loop() {
   if (Serial.available() > 0 && Serial.read() == 'a') {
+    logMessage("Received dispense command.");
     waterValve.open();
     delay(3000);
     waterValve.close();
