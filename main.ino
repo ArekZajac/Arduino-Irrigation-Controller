@@ -1,9 +1,29 @@
 #include <SimpleDHT.h>
 #include <Servo.h>
 
+// Configuration struct
+struct Configuration {
+    int dhtPin;
+    int waterPin;
+    int servoPin;
+    int dhtSampleRate;
+    int valveOpenPosition;
+    int valveClosePosition;
+};
+
+// Global configuration
+Configuration config = {
+    .dhtPin = 2,
+    .waterPin = A3,
+    .servoPin = 3,
+    .dhtSampleRate = 1500,
+    .valveOpenPosition = 90,
+    .valveClosePosition = 45
+};
+
 // Function to log messages
 void logMessage(const char* message) {
-  Serial.println(message);
+    Serial.println(message);
 }
 
 class DHTSensor {
@@ -58,53 +78,50 @@ class WaterSensor {
 class WaterValve {
   private:
     Servo servo;
+    int openPosition;
+    int closePosition;
     
   public:
-    WaterValve(int pin) {
+    WaterValve(int pin, int openPos, int closePos) : openPosition(openPos), closePosition(closePos) {
       servo.attach(pin);
       logMessage("WaterValve initialized.");
     }
     
     void open() {
-      servo.write(90);
+      servo.write(openPosition);
       logMessage("Water valve opened.");
     }
     
     void close() {
-      servo.write(45);
+      servo.write(closePosition);
       logMessage("Water valve closed.");
     }
 };
 
-const int DHT_PIN = 2;
-const int WATER_PIN = A3;
-const int SERVO_PIN = 3;
-const int DHT_SAMPLE_RATE = 1500;
-
-DHTSensor dhtSensor(DHT_PIN);
-WaterSensor waterSensor(WATER_PIN);
-WaterValve waterValve(SERVO_PIN);
+DHTSensor dhtSensor(config.dhtPin);
+WaterSensor waterSensor(config.waterPin);
+WaterValve waterValve(config.servoPin, config.valveOpenPosition, config.valveClosePosition);
 
 void setup() {
-  Serial.begin(115200);
-  logMessage("Setup completed.");
-  waterValve.close();
+    Serial.begin(115200);
+    logMessage("Setup completed.");
+    waterValve.close();
 }
 
 void loop() {
-  if (Serial.available() > 0 && Serial.read() == 'a') {
-    logMessage("Received dispense command.");
-    waterValve.open();
-    delay(3000);
-    waterValve.close();
-  }
+    if (Serial.available() > 0 && Serial.read() == 'a') {
+        logMessage("Received dispense command.");
+        waterValve.open();
+        delay(3000);
+        waterValve.close();
+    }
 
-  dhtSensor.refresh();
-  waterSensor.refresh();
+    dhtSensor.refresh();
+    waterSensor.refresh();
 
-  Serial.print('t'); Serial.println(dhtSensor.getTemperature());
-  Serial.print('h'); Serial.println(dhtSensor.getHumidity());
-  Serial.print('w'); Serial.println(waterSensor.getWaterLevel());
-  
-  delay(DHT_SAMPLE_RATE);
+    Serial.print('t'); Serial.println(dhtSensor.getTemperature());
+    Serial.print('h'); Serial.println(dhtSensor.getHumidity());
+    Serial.print('w'); Serial.println(waterSensor.getWaterLevel());
+    
+    delay(config.dhtSampleRate);
 }
