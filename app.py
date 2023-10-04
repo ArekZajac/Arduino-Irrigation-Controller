@@ -1,93 +1,68 @@
-from pyparsing import col
 import serial
-from tkinter import *
 import tkinter as tk
-import time
 import re
+from pyparsing import col  # Not used in the provided code
 
-ser = serial.Serial('/dev/tty.usbmodem11401', baudrate = 115200, timeout = 1)
-options = [
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7"
-]
+class SerialReader:
+    def __init__(self, port):
+        self.ser = serial.Serial(port, baudrate=115200, timeout=1)
 
-def dispense():
-    ser.write(b'a')
+    def read(self):
+        return str(self.ser.readline())
 
-def reader():
-    input = str(ser.readline())
-    print(input)
-    if "t" in input:
-        labelTemp2.config(text=re.sub("[^0-9]", "", input))
-    if "h" in input:
-        labelHum2.config(text=re.sub("[^0-9]", "", input))
-    if "w" in input:
-        labelWater2.config(text=re.sub("[^0-9]", "", input))
-    
-    input = str(ser.readline())
-    print(input)
-    if "t" in input:
-        labelTemp2.config(text=re.sub("[^0-9]", "", input))
-    if "h" in input:
-        labelHum2.config(text=re.sub("[^0-9]", "", input))
-    if "w" in input:
-        labelWater2.config(text=re.sub("[^0-9]", "", input))
-    
-    input = str(ser.readline())
-    print(input)
-    if "t" in input:
-        labelTemp2.config(text=re.sub("[^0-9]", "", input))
-    if "h" in input:
-        labelHum2.config(text=re.sub("[^0-9]", "", input))
-    if "w" in input:
-        labelWater2.config(text=re.sub("[^0-9]", "", input))
+    def write(self, data):
+        self.ser.write(data)
 
-root = Tk()
-root.title('Water-O-Matic')
-autoEnabled = tk.IntVar();
-clicked = StringVar()
-clicked.set( "1" )
+class WaterOMatic:
+    def __init__(self, root, serial_reader):
+        self.root = root
+        self.serial_reader = serial_reader
+        self.create_widgets()
 
-labelTemp1 = tk.Label(root, text="Current Temperature: ")
-labelTemp1.grid(row=0, column=0)
+    def create_widgets(self):
+        self.root.title('Water-O-Matic')
 
-labelTemp2 = tk.Label(root, text="23")
-labelTemp2.grid(row=0, column=1)
+        self.auto_enabled = tk.IntVar()
+        self.clicked = tk.StringVar(value="1")
 
-labelHum1 = tk.Label(root, text="Current Humidity: ")
-labelHum1.grid(row=1, column=0)
+        self.labels = {
+            'Temperature': (tk.Label(self.root, text="Current Temperature: "), tk.Label(self.root, text="23")),
+            'Humidity': (tk.Label(self.root, text="Current Humidity: "), tk.Label(self.root, text="45")),
+            'Water': (tk.Label(self.root, text="Water Reading: "), tk.Label(self.root, text="41"))
+        }
 
-labelHum2 = tk.Label(root, text="45")
-labelHum2.grid(row=1, column=1)
+        for i, (key, (label1, label2)) in enumerate(self.labels.items()):
+            label1.grid(row=i, column=0)
+            label2.grid(row=i, column=1)
 
-labelWater1 = tk.Label(root, text="Water Reading: ")
-labelWater1.grid(row=2, column=0)
+        tk.Button(self.root, text='Update', command=self.reader).grid(row=3, column=0)
+        tk.Button(self.root, text='Water Now', command=self.dispense).grid(row=4, column=0)
 
-labelWater2 = tk.Label(root, text="41")
-labelWater2.grid(row=2, column=1)
+        tk.Checkbutton(self.root, text='Automatic Watering', variable=self.auto_enabled, onvalue=1, offvalue=0).grid(row=5, column=0)
 
-checker = tk.Button(root, text='Update', command=reader)
-checker.grid(row=3, column=0)
+        tk.Label(self.root, text="Auto water every ").grid(row=6, column=0)
+        tk.OptionMenu(self.root, self.clicked, *["1", "2", "3", "4", "5", "6", "7"]).grid(row=6, column=1)
+        tk.Label(self.root, text=" days").grid(row=6, column=2)
 
-btn_Manual = tk.Button(root, text='Water Now', command=dispense)
-btn_Manual.grid(row=4, column=0)
+        self.root.geometry('350x350')
 
-check_Automatic = tk.Checkbutton(root, text='Automatic Watering', variable=autoEnabled, onvalue=1, offvalue=0)
-check_Automatic.grid(row=5, column=0)
+    def reader(self):
+        self.update_labels(self.serial_reader.read())
 
-label1 = tk.Label(root, text="Auto water every ")
-label1.grid(row=6, column=0)
+    def dispense(self):
+        self.serial_reader.write(b'a')
 
-drop = OptionMenu( root , clicked , *options )
-drop.grid(row=6, column=1)
+    def update_labels(self, input):
+        print(input)
+        for prefix, (_, label) in self.labels.items():
+            if prefix[0].lower() in input:
+                label.config(text=re.sub("[^0-9]", "", input))
 
-label2 = tk.Label(root, text=" days")
-label2.grid(row=6, column=2)
+def main():
+    root = tk.Tk()
+    serial_reader = SerialReader('/dev/tty.usbmodem11401')
+    app = WaterOMatic(root, serial_reader)
+    root.mainloop()
 
-root.geometry('350x350')
-root.mainloop()
+if __name__ == "__main__":
+    main()
